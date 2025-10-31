@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI文字转视频生成器</title>
+  <style>
+    body {
+      font-family: "Microsoft YaHei", sans-serif;
+      background: linear-gradient(to bottom right, #111, #333);
+      color: #fff;
+      text-align: center;
+      padding: 40px;
+    }
+    h1 { color: #ffd700; }
+    textarea {
+      width: 90%;
+      height: 120px;
+      border-radius: 10px;
+      border: none;
+      padding: 10px;
+      font-size: 16px;
+      outline: none;
+    }
+    button {
+      margin-top: 20px;
+      padding: 12px 30px;
+      background: #ffd700;
+      border: none;
+      border-radius: 10px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    video {
+      margin-top: 30px;
+      width: 300px;
+      border-radius: 20px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎬 AI 文字转视频生成器（离线版）</h1>
+  <p>输入你的情感文案，自动生成短视频 🎶</p>
+  <textarea id="inputText" placeholder="例如：我为什么要拼命挣钱，因为我没有背景……"></textarea><br />
+  <button onclick="generateVideo()">生成视频</button>
+  <div id="status"></div>
+  <video id="preview" controls></video>
+
+  <script>
+    async function generateVideo() {
+      const text = document.getElementById("inputText").value.trim();
+      if (!text) return alert("请输入文本");
+
+      const status = document.getElementById("status");
+      const video = document.getElementById("preview");
+      status.innerHTML = "正在生成背景和配乐，请稍候…";
+
+      // 1. 根据文字生成背景图
+      const bg = `https://source.unsplash.com/720x1280/?night,city,emotion,${encodeURIComponent(text.slice(0,10))}`;
+
+      // 2. 随机选择一段背景音乐
+      const musicList = [
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+      ];
+      const music = musicList[Math.floor(Math.random() * musicList.length)];
+
+      // 3. 使用 Canvas 绘制字幕（简化版）
+      status.innerHTML = "正在合成视频...";
+
+      // 使用 HTML5 MediaRecorder 动态生成视频
+      const canvas = document.createElement("canvas");
+      canvas.width = 720;
+      canvas.height = 1280;
+      const ctx = canvas.getContext("2d");
+
+      const stream = canvas.captureStream();
+      const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+      const chunks = [];
+
+      recorder.ondataavailable = e => chunks.push(e.data);
+      recorder.onstop = e => {
+        const blob = new Blob(chunks, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        video.src = url;
+        video.style.display = "block";
+        status.innerHTML = "✅ 视频生成成功！";
+      };
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = bg;
+      await new Promise(r => img.onload = r);
+
+      recorder.start();
+
+      let i = 0;
+      const words = text.split("");
+      const draw = setInterval(() => {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(0, 1000, 720, 280);
+        ctx.fillStyle = "#fff";
+        ctx.font = "32px Microsoft YaHei";
+        ctx.textAlign = "center";
+        ctx.fillText(words.slice(0, i).join(""), 360, 1150);
+        i++;
+        if (i > words.length) {
+          clearInterval(draw);
+          recorder.stop();
+        }
+      }, 100);
+    }
+  </script>
+</body>
+</html>
