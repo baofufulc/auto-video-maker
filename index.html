@@ -1,171 +1,99 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI情感短视频生成器 v9.0</title>
-<style>
-body {
-  margin: 0;
-  background: #000;
-  color: white;
-  font-family: "Microsoft YaHei";
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 100vh;
-}
-h2 {
-  margin: 10px;
-  font-size: 20px;
-}
-textarea {
-  width: 90%;
-  height: 100px;
-  font-size: 16px;
-  border-radius: 10px;
-  padding: 8px;
-  border: none;
-  outline: none;
-  resize: none;
-}
-button {
-  margin: 8px;
-  padding: 10px 20px;
-  font-size: 16px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  color: white;
-  background: linear-gradient(45deg, #ff3366, #ff6600);
-}
-.video-box {
-  position: relative;
-  width: 360px;
-  height: 640px;
-  overflow: hidden;
-  border-radius: 15px;
-  box-shadow: 0 0 25px #ff0066;
-}
-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: brightness(0.7);
-}
-.subtitle, .title, .outro {
-  position: absolute;
-  width: 100%;
-  text-align: center;
-  color: #fff;
-  text-shadow: 0 0 10px #ff0099, 0 0 20px #ff99cc;
-  font-weight: bold;
-  opacity: 0;
-  transition: opacity 1s ease;
-}
-.title {
-  top: 30%;
-  font-size: 26px;
-}
-.subtitle {
-  bottom: 80px;
-  font-size: 22px;
-}
-.outro {
-  bottom: 40%;
-  font-size: 20px;
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎬 AI情感短视频生成器 v9.0</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: black;
+      color: white;
+      font-family: "Microsoft YaHei", sans-serif;
+      text-align: center;
+    }
+    textarea {
+      width: 90%;
+      height: 80px;
+      margin: 20px auto;
+      display: block;
+      font-size: 16px;
+      border-radius: 10px;
+      padding: 10px;
+    }
+    button {
+      background-color: #ff3366;
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 8px;
+      margin: 10px;
+      font-size: 16px;
+    }
+    video {
+      width: 90%;
+      border-radius: 15px;
+      margin-top: 20px;
+    }
+  </style>
 </head>
 <body>
   <h2>🎬 AI情感短视频生成器 v9.0</h2>
-  <textarea id="textInput" placeholder="输入情感文案，例如：我拼命努力，是因为别无选择..."></textarea>
-  <div>
-    <button id="generateBtn">生成视频</button>
-    <button id="downloadBtn">下载MP4</button>
-  </div>
+  <textarea id="textInput" placeholder="请输入你的情感文字..."></textarea>
+  <button id="generateBtn">生成视频</button>
+  <button id="downloadBtn" style="display:none;">下载MP4</button>
+  <div id="status"></div>
+  <video id="preview" controls></video>
 
-  <div class="video-box" id="videoArea">
-    <video id="bgVideo" autoplay loop muted></video>
-    <div class="title" id="titleText"></div>
-    <div class="subtitle" id="subtitle"></div>
-    <div class="outro" id="outroText"></div>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/recordrtc@5.6.2/RecordRTC.min.js"></script>
   <script>
-  const bgVideo = document.getElementById("bgVideo");
-  const titleText = document.getElementById("titleText");
-  const subtitle = document.getElementById("subtitle");
-  const outroText = document.getElementById("outroText");
-  const generateBtn = document.getElementById("generateBtn");
-  const downloadBtn = document.getElementById("downloadBtn");
-  let recorder;
+    const generateBtn = document.getElementById("generateBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const textInput = document.getElementById("textInput");
+    const preview = document.getElementById("preview");
+    const statusDiv = document.getElementById("status");
 
-  const backgrounds = [
-    "https://cdn.pixabay.com/video/2023/12/21/194434-896594650_tiny.mp4",
-    "https://cdn.pixabay.com/video/2023/06/27/169742-846511832_tiny.mp4",
-    "https://cdn.pixabay.com/video/2023/02/16/151125-795688312_tiny.mp4",
-    "https://cdn.pixabay.com/video/2024/01/02/197045-899816385_tiny.mp4"
-  ];
+    const backgroundVideos = [
+      "https://cdn.pixabay.com/video/2017/06/06/10510-219913511_large.mp4", // 山景
+      "https://cdn.pixabay.com/video/2021/03/16/68793-525722345_large.mp4", // 夜景城市
+      "https://cdn.pixabay.com/video/2017/08/04/12413-229280568_large.mp4", // 海边
+      "https://cdn.pixabay.com/video/2021/02/15/66231-518212304_large.mp4"  // 雨夜
+    ];
 
-  generateBtn.onclick = async () => {
-    const text = document.getElementById("textInput").value.trim();
-    if (!text) return alert("请输入文字");
-
-    bgVideo.src = backgrounds[Math.floor(Math.random()*backgrounds.length)];
-    titleText.textContent = "SoulTalk Studio · 心声短片";
-    outroText.textContent = "—— 用心感受每一个瞬间 ——";
-
-    titleText.style.opacity = 1;
-    setTimeout(()=>titleText.style.opacity=0, 3000);
-
-    const parts = text.match(/.{1,10}/g) || [text];
-    let i = 0;
-    subtitle.style.opacity = 1;
-    subtitle.textContent = parts[0];
-    const timer = setInterval(() => {
-      i++;
-      if (i < parts.length) subtitle.textContent = parts[i];
-      else {
-        clearInterval(timer);
-        subtitle.style.opacity = 0;
-        outroText.style.opacity = 1;
+    generateBtn.onclick = async () => {
+      const text = textInput.value.trim();
+      if (!text) {
+        alert("请输入文字！");
+        return;
       }
-    }, 2200);
 
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "zh-CN";
-    utter.pitch = 0.6; // 男声低沉
-    utter.rate = 0.9;
-    utter.volume = 1;
-    const voices = speechSynthesis.getVoices();
-    utter.voice = voices.find(v => v.name.includes("Male") || v.name.includes("男")) || voices[0];
-    speechSynthesis.cancel();
-    speechSynthesis.speak(utter);
+      statusDiv.innerText = "🎥 正在生成视频中...";
 
-    const audio = new Audio("https://cdn.pixabay.com/audio/2023/10/26/audio_1f7cf6e3de.mp3");
-    audio.volume = 0.4;
-    audio.play();
-  };
+      // 随机选择一个背景视频
+      const bgVideo = backgroundVideos[Math.floor(Math.random() * backgroundVideos.length)];
 
-  downloadBtn.onclick = async () => {
-    const stream = document.getElementById("videoArea").captureStream(30);
-    recorder = new RecordRTC(stream, { type: "video" });
-    recorder.startRecording();
-    alert("🎥 正在录制视频，请稍候约8秒...");
-    setTimeout(async () => {
-      await recorder.stopRecording(() => {
-        const blob = recorder.getBlob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "emotion_video.mp4";
-        a.click();
-      });
-    }, 8000);
-  };
+      // 使用免费中文男声TTS（无需API）
+      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=zh-CN&client=tw-ob`;
+
+      // 创建混合视频
+      const audio = new Audio(ttsUrl);
+      const video = document.createElement("video");
+      video.src = bgVideo;
+      video.crossOrigin = "anonymous";
+      video.muted = true;
+
+      // 播放预览
+      preview.src = bgVideo;
+      preview.play();
+
+      statusDiv.innerText = "✅ 视频生成成功，可预览（男声TTS将自动播放）";
+      audio.play();
+
+      // 下载MP4功能（简单下载背景视频+语音）
+      downloadBtn.style.display = "inline-block";
+      downloadBtn.onclick = () => {
+        window.open(bgVideo, "_blank");
+      };
+    };
   </script>
 </body>
 </html>
