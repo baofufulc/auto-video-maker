@@ -3,18 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI情感短视频生成器 v5</title>
+<title>AI情感短视频生成器 v7</title>
 <style>
 body {
-  margin: 0;
-  background: #000;
-  color: white;
+  margin: 0; background: #000; color: white;
   font-family: "Microsoft YaHei", sans-serif;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100vh;
-  overflow: hidden;
+  display: flex; flex-direction: column; align-items: center;
+  height: 100vh; overflow: hidden;
 }
 h2 { margin-top: 10px; }
 textarea {
@@ -22,9 +17,8 @@ textarea {
   border-radius: 8px; padding: 8px; outline: none; border: none;
 }
 button {
-  margin: 10px; padding: 10px 20px;
+  margin: 8px; padding: 10px 20px; font-size: 16px;
   border: none; border-radius: 8px;
-  font-size: 16px;
   background: linear-gradient(45deg, #ff3366, #ff6600);
   color: white;
 }
@@ -42,26 +36,30 @@ video {
   color: #fff; text-shadow: 0 0 12px #ff0066, 0 0 20px #ff66cc;
   animation: glow 2s ease-in-out infinite alternate;
 }
-@keyframes glow {
-  0% {opacity: 0.6;}
-  100% {opacity: 1;}
-}
+@keyframes glow { 0% {opacity: 0.6;} 100% {opacity: 1;} }
 </style>
 </head>
 <body>
-  <h2>🎬 AI情感短视频生成器 v5</h2>
-  <textarea id="textInput" placeholder="输入文字，如：我拼命挣钱，因为没有人能替我..."></textarea>
-  <button id="generateBtn">生成视频</button>
+  <h2>🎬 AI情感短视频生成器 v7</h2>
+  <textarea id="textInput" placeholder="输入文字，例如：我拼命挣钱，因为没有人能替我..."></textarea>
+  <div>
+    <button id="generateBtn">生成视频</button>
+    <button id="downloadBtn" disabled>导出MP4</button>
+  </div>
 
   <div class="video-container">
     <video id="preview" autoplay loop muted></video>
+    <audio id="bgm" loop></audio>
     <div id="subtitle" class="subtitle"></div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/recordrtc/RecordRTC.min.js"></script>
   <script>
   const preview = document.getElementById("preview");
+  const bgm = document.getElementById("bgm");
   const subtitle = document.getElementById("subtitle");
   const generateBtn = document.getElementById("generateBtn");
+  const downloadBtn = document.getElementById("downloadBtn");
 
   const backgrounds = {
     positive: [
@@ -82,14 +80,19 @@ video {
     ]
   };
 
+  const musics = {
+    positive: "https://cdn.pixabay.com/download/audio/2023/04/11/audio_55b63c7c68.mp3?filename=inspired-ambient-piano-145468.mp3",
+    sad: "https://cdn.pixabay.com/download/audio/2023/03/15/audio_29ec0ec167.mp3?filename=sad-piano-143077.mp3",
+    lonely: "https://cdn.pixabay.com/download/audio/2023/04/11/audio_8d9f6d7a7d.mp3?filename=lonesome-145487.mp3",
+    healing: "https://cdn.pixabay.com/download/audio/2023/04/12/audio_9c8f0e7895.mp3?filename=soft-healing-piano-145611.mp3"
+  };
+
   function detectEmotion(text) {
-    const positiveWords = ["努力", "奋斗", "希望", "阳光", "梦想"];
-    const sadWords = ["累", "心酸", "眼泪", "疲惫", "失落"];
-    const lonelyWords = ["孤独", "寂寞", "夜晚", "一个人"];
-    const healingWords = ["治愈", "温柔", "美好", "平静"];
-
+    const positiveWords = ["努力","奋斗","希望","阳光","梦想"];
+    const sadWords = ["累","心酸","眼泪","疲惫","失落","难过"];
+    const lonelyWords = ["孤独","寂寞","夜晚","一个人"];
+    const healingWords = ["治愈","温柔","美好","平静","安静"];
     text = text.toLowerCase();
-
     if (sadWords.some(w => text.includes(w))) return "sad";
     if (lonelyWords.some(w => text.includes(w))) return "lonely";
     if (healingWords.some(w => text.includes(w))) return "healing";
@@ -102,9 +105,13 @@ video {
 
     const emotion = detectEmotion(text);
     const bgUrl = backgrounds[emotion][Math.floor(Math.random() * backgrounds[emotion].length)];
-    preview.src = bgUrl;
+    const musicUrl = musics[emotion];
 
-    // 字幕节奏
+    preview.src = bgUrl;
+    bgm.src = musicUrl;
+    bgm.play();
+
+    // 显示字幕
     const parts = text.match(/.{1,10}/g) || [text];
     let i = 0;
     const showNext = () => {
@@ -115,7 +122,7 @@ video {
     };
     showNext();
 
-    // 中文男声
+    // 中文男声朗读
     const synth = window.speechSynthesis;
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = "zh-CN";
@@ -123,6 +130,31 @@ video {
     utter.rate = 1.0;
     utter.volume = 1.0;
     synth.speak(utter);
+
+    downloadBtn.disabled = false;
+  };
+
+  downloadBtn.onclick = async () => {
+    const videoStream = preview.captureStream();
+    const audioStream = bgm.captureStream();
+    const mixedStream = new MediaStream([
+      ...videoStream.getVideoTracks(),
+      ...audioStream.getAudioTracks()
+    ]);
+
+    const recorder = RecordRTC(mixedStream, { type: 'video' });
+    recorder.startRecording();
+
+    setTimeout(async () => {
+      await recorder.stopRecording();
+      const blob = recorder.getBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'AI情感短视频.mp4';
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 10000);
   };
   </script>
 </body>
