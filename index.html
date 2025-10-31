@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI情感短视频生成器 v7</title>
+<title>AI情感短视频生成器 v7.2</title>
 <style>
 body {
   margin: 0; background: #000; color: white;
@@ -20,7 +20,7 @@ button {
   margin: 8px; padding: 10px 20px; font-size: 16px;
   border: none; border-radius: 8px;
   background: linear-gradient(45deg, #ff3366, #ff6600);
-  color: white;
+  color: white; cursor: pointer;
 }
 .video-container {
   position: relative; width: 360px; height: 640px;
@@ -40,25 +40,24 @@ video {
 </style>
 </head>
 <body>
-  <h2>🎬 AI情感短视频生成器 v7</h2>
-  <textarea id="textInput" placeholder="输入文字，例如：我拼命挣钱，因为没有人能替我..."></textarea>
+  <h2>🎬 AI情感短视频生成器 v7.2</h2>
+  <textarea id="textInput" placeholder="输入文字，例如：我拼命努力，是因为别无选择..."></textarea>
   <div>
     <button id="generateBtn">生成视频</button>
-    <button id="downloadBtn" disabled>导出MP4</button>
+    <button id="downloadBtn">下载MP4</button>
   </div>
 
-  <div class="video-container">
+  <div class="video-container" id="videoArea">
     <video id="preview" autoplay loop muted></video>
     <audio id="bgm" loop></audio>
     <div id="subtitle" class="subtitle"></div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/recordrtc/RecordRTC.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/recordrtc@5.6.2/RecordRTC.min.js"></script>
   <script>
   const preview = document.getElementById("preview");
   const bgm = document.getElementById("bgm");
   const subtitle = document.getElementById("subtitle");
-  const generateBtn = document.getElementById("generateBtn");
   const downloadBtn = document.getElementById("downloadBtn");
 
   const backgrounds = {
@@ -99,7 +98,9 @@ video {
     return "positive";
   }
 
-  generateBtn.onclick = async () => {
+  let recorder;
+
+  document.getElementById("generateBtn").onclick = async () => {
     const text = document.getElementById("textInput").value.trim();
     if (!text) return alert("请输入文字！");
 
@@ -110,51 +111,45 @@ video {
     preview.src = bgUrl;
     bgm.src = musicUrl;
     bgm.play();
+    preview.muted = false;
 
-    // 显示字幕
     const parts = text.match(/.{1,10}/g) || [text];
     let i = 0;
-    const showNext = () => {
-      if (i < parts.length) {
-        subtitle.textContent = parts[i++];
-        setTimeout(showNext, 2000);
-      } else subtitle.textContent = "";
-    };
-    showNext();
+    subtitle.textContent = parts[0];
+    const timer = setInterval(() => {
+      if (++i < parts.length) subtitle.textContent = parts[i];
+      else clearInterval(timer);
+    }, 2000);
 
-    // 中文男声朗读
     const synth = window.speechSynthesis;
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = "zh-CN";
-    utter.pitch = 0.9;
-    utter.rate = 1.0;
-    utter.volume = 1.0;
+    utter.pitch = 0.8;
+    utter.rate = 0.95;
+    synth.cancel();
     synth.speak(utter);
-
-    downloadBtn.disabled = false;
   };
 
   downloadBtn.onclick = async () => {
-    const videoStream = preview.captureStream();
+    const videoArea = document.getElementById("videoArea");
+    const stream = videoArea.captureStream(30);
     const audioStream = bgm.captureStream();
-    const mixedStream = new MediaStream([
-      ...videoStream.getVideoTracks(),
-      ...audioStream.getAudioTracks()
-    ]);
+    const combined = new MediaStream([...stream.getTracks(), ...audioStream.getTracks()]);
 
-    const recorder = RecordRTC(mixedStream, { type: 'video' });
+    recorder = new RecordRTC(combined, { type: "video" });
     recorder.startRecording();
 
+    alert("录制中... 5 秒后自动完成");
     setTimeout(async () => {
-      await recorder.stopRecording();
-      const blob = recorder.getBlob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'AI情感短视频.mp4';
-      a.click();
-      URL.revokeObjectURL(url);
-    }, 10000);
+      await recorder.stopRecording(() => {
+        const blob = recorder.getBlob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "ai_video.mp4";
+        a.click();
+      });
+    }, 5000);
   };
   </script>
 </body>
