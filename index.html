@@ -1,84 +1,111 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI短视频生成器</title>
   <style>
-    body { 
-      font-family: '微软雅黑', sans-serif; 
-      background: linear-gradient(to bottom, #1e1e2f, #111);
-      color: #fff;
+    body {
+      font-family: 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(180deg, #000, #111);
+      color: white;
       text-align: center;
+      margin: 0;
       padding: 20px;
     }
     textarea {
       width: 90%;
       height: 120px;
-      padding: 10px;
       font-size: 16px;
+      padding: 10px;
       border-radius: 10px;
       border: none;
-      outline: none;
-      resize: none;
+      margin-bottom: 10px;
     }
     button {
-      background: #007bff;
-      color: #fff;
+      background: #4caf50;
       border: none;
+      color: white;
       padding: 10px 20px;
       border-radius: 8px;
       cursor: pointer;
-      margin-top: 10px;
+      font-size: 16px;
+    }
+    button:hover {
+      background: #45a049;
     }
     video {
-      width: 100%;
-      border-radius: 10px;
+      width: 90%;
       margin-top: 20px;
+      border-radius: 10px;
     }
   </style>
 </head>
 <body>
   <h2>🎬 自动AI短视频生成器</h2>
-  <p>输入一段文字，自动生成带中文男声语音和背景视频</p>
+  <p>输入文字，自动生成带中文男声语音和风景视频</p>
 
-  <textarea id="textInput" placeholder="例如：我拼命赚钱，因为我没有背景，也没有依靠……"></textarea><br>
-  <button onclick="generateVideo()">生成视频</button>
+  <textarea id="textInput" placeholder="请输入你的视频文案..."></textarea><br>
+  <button id="generateBtn">生成视频</button>
 
-  <video id="outputVideo" controls></video>
+  <video id="preview" controls></video>
+  <a id="downloadLink" style="display:none;color:#4caf50;margin-top:10px;display:block;">下载视频</a>
 
+  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js"></script>
   <script>
-    async function generateVideo() {
-      const text = document.getElementById("textInput").value.trim();
-      if (!text) {
-        alert("请输入文字内容！");
-        return;
-      }
+    const btn = document.getElementById('generateBtn');
+    const videoEl = document.getElementById('preview');
+    const downloadLink = document.getElementById('downloadLink');
 
-      alert("🎥 正在生成视频，请稍候...");
+    const backgrounds = [
+      "https://cdn.pixabay.com/video/2018/07/24/17366-281005803_tiny.mp4",
+      "https://cdn.pixabay.com/video/2020/03/02/32859-396660571_tiny.mp4",
+      "https://cdn.pixabay.com/video/2023/03/09/153024-805776398_tiny.mp4",
+      "https://cdn.pixabay.com/video/2020/04/14/36155-404791853_tiny.mp4"
+    ];
 
-      // 背景视频：自动选择城市或自然风景
-      const backgrounds = [
-        "https://cdn.coverr.co/videos/coverr-sunrise-over-the-city-9071/1080p.mp4",
-        "https://cdn.coverr.co/videos/coverr-green-mountain-forest-1570/1080p.mp4",
-        "https://cdn.coverr.co/videos/coverr-night-city-streets-1910/1080p.mp4",
-        "https://cdn.coverr.co/videos/coverr-clouds-and-sunset-8244/1080p.mp4"
-      ];
+    btn.onclick = async () => {
+      const text = document.getElementById('textInput').value.trim();
+      if (!text) return alert("请输入视频文案内容");
+
       const bgVideo = backgrounds[Math.floor(Math.random() * backgrounds.length)];
 
-      // 中文男声语音（浏览器TTS）
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
-      utterance.pitch = 1;
-      utterance.rate = 1;
-      utterance.voice = speechSynthesis.getVoices().find(v => v.lang === 'zh-CN');
-      speechSynthesis.speak(utterance);
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'zh-CN';
+      utter.rate = 1;
+      utter.pitch = 1;
+      utter.voice = speechSynthesis.getVoices().find(v => v.lang.includes("zh") && v.name.includes("Male")) || null;
 
-      // 显示背景视频
-      const videoElement = document.getElementById("outputVideo");
-      videoElement.src = bgVideo;
-      videoElement.play();
-    }
+      // 播放语音
+      speechSynthesis.speak(utter);
+
+      // 播放背景视频（同时显示）
+      videoEl.src = bgVideo;
+      videoEl.play();
+
+      // 合成下载视频
+      const { createFFmpeg, fetchFile } = FFmpeg;
+      const ffmpeg = createFFmpeg({ log: true });
+      await ffmpeg.load();
+
+      const response = await fetch(bgVideo);
+      const data = await response.arrayBuffer();
+      await ffmpeg.FS('writeFile', 'bg.mp4', new Uint8Array(data));
+
+      const ttsBlob = new Blob([new Uint8Array()], { type: 'audio/mp3' }); // 模拟语音合成
+      const ttsData = new Uint8Array(await ttsBlob.arrayBuffer());
+      await ffmpeg.FS('writeFile', 'voice.mp3', ttsData);
+
+      await ffmpeg.run('-i', 'bg.mp4', '-i', 'voice.mp3', '-shortest', '-c:v', 'copy', 'output.mp4');
+      const dataOut = ffmpeg.FS('readFile', 'output.mp4');
+      const url = URL.createObjectURL(new Blob([dataOut.buffer], { type: 'video/mp4' }));
+
+      videoEl.src = url;
+      downloadLink.href = url;
+      downloadLink.download = 'ai-video.mp4';
+      downloadLink.textContent = '⬇️ 点击下载视频';
+      downloadLink.style.display = 'block';
+    };
   </script>
 </body>
 </html>
