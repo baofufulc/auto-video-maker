@@ -1,174 +1,129 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AI情感短视频生成器 v2</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI情感短视频生成器 v5</title>
 <style>
-  body {
-    margin: 0;
-    padding: 0;
-    font-family: "Microsoft YaHei", sans-serif;
-    background: #000;
-    color: white;
-    text-align: center;
-  }
-  h2 {
-    margin-top: 20px;
-  }
-  textarea {
-    width: 90%;
-    height: 100px;
-    font-size: 16px;
-    padding: 10px;
-    border-radius: 8px;
-    border: none;
-    resize: none;
-    outline: none;
-  }
-  button {
-    margin-top: 10px;
-    background: linear-gradient(45deg, #ff416c, #ff4b2b);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 20px;
-    font-size: 16px;
-  }
-  .video-container {
-    position: relative;
-    display: inline-block;
-    margin-top: 20px;
-  }
-  video {
-    width: 90%;
-    border-radius: 10px;
-    filter: blur(4px) brightness(0.7);
-  }
-  .subtitle {
-    position: absolute;
-    bottom: 60px;
-    width: 100%;
-    text-align: center;
-    font-size: 22px;
-    font-weight: bold;
-    color: white;
-    text-shadow: 2px 2px 6px black;
-    animation: fade 1.5s ease-in-out;
-  }
-  @keyframes fade {
-    0% {opacity: 0;}
-    50% {opacity: 1;}
-    100% {opacity: 0;}
-  }
-  a {
-    display: none;
-    color: #4caf50;
-  }
+body {
+  margin: 0;
+  background: #000;
+  color: white;
+  font-family: "Microsoft YaHei", sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+}
+h2 { margin-top: 10px; }
+textarea {
+  width: 90%; height: 100px; font-size: 16px;
+  border-radius: 8px; padding: 8px; outline: none; border: none;
+}
+button {
+  margin: 10px; padding: 10px 20px;
+  border: none; border-radius: 8px;
+  font-size: 16px;
+  background: linear-gradient(45deg, #ff3366, #ff6600);
+  color: white;
+}
+.video-container {
+  position: relative; width: 360px; height: 640px;
+  border-radius: 12px; overflow: hidden; margin-top: 10px;
+}
+video {
+  width: 100%; height: 100%; object-fit: cover;
+  filter: brightness(0.7);
+}
+.subtitle {
+  position: absolute; bottom: 60px; width: 100%;
+  text-align: center; font-size: 22px; font-weight: bold;
+  color: #fff; text-shadow: 0 0 12px #ff0066, 0 0 20px #ff66cc;
+  animation: glow 2s ease-in-out infinite alternate;
+}
+@keyframes glow {
+  0% {opacity: 0.6;}
+  100% {opacity: 1;}
+}
 </style>
 </head>
 <body>
-  <h2>🎬 抖音风格·动态字幕自动视频生成器</h2>
-  <p>输入你的文字，自动生成带语音、字幕和背景的短视频</p>
-
-  <textarea id="textInput" placeholder="例如：我拼命挣钱，因为我没有背景，没有依靠。"></textarea><br>
+  <h2>🎬 AI情感短视频生成器 v5</h2>
+  <textarea id="textInput" placeholder="输入文字，如：我拼命挣钱，因为没有人能替我..."></textarea>
   <button id="generateBtn">生成视频</button>
 
   <div class="video-container">
-    <video id="preview" controls></video>
+    <video id="preview" autoplay loop muted></video>
     <div id="subtitle" class="subtitle"></div>
   </div>
-  <br>
-  <a id="downloadLink">⬇️ 下载视频</a>
 
-  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js"></script>
   <script>
-    const btn = document.getElementById('generateBtn');
-    const preview = document.getElementById('preview');
-    const subtitle = document.getElementById('subtitle');
-    const link = document.getElementById('downloadLink');
+  const preview = document.getElementById("preview");
+  const subtitle = document.getElementById("subtitle");
+  const generateBtn = document.getElementById("generateBtn");
 
-    const backgrounds = [
+  const backgrounds = {
+    positive: [
+      "https://cdn.pixabay.com/video/2023/06/14/167305-839689132_tiny.mp4",
+      "https://cdn.pixabay.com/video/2023/02/16/151125-795688312_tiny.mp4"
+    ],
+    sad: [
+      "https://cdn.pixabay.com/video/2024/01/02/197045-899816385_tiny.mp4",
+      "https://cdn.pixabay.com/video/2023/12/21/194434-896594650_tiny.mp4"
+    ],
+    lonely: [
       "https://cdn.pixabay.com/video/2023/03/09/153024-805776398_tiny.mp4",
-      "https://cdn.pixabay.com/video/2020/04/14/36155-404791853_tiny.mp4",
-      "https://cdn.pixabay.com/video/2020/03/02/32859-396660571_tiny.mp4"
-    ];
-    const music = "https://cdn.pixabay.com/download/audio/2022/03/15/audio_8e8f8f8a14.mp3?filename=soft-piano-ambient-14147.mp3";
+      "https://cdn.pixabay.com/video/2023/06/17/168230-842420944_tiny.mp4"
+    ],
+    healing: [
+      "https://cdn.pixabay.com/video/2023/09/04/178506-863291441_tiny.mp4",
+      "https://cdn.pixabay.com/video/2023/06/27/169742-846511832_tiny.mp4"
+    ]
+  };
 
-    btn.onclick = async () => {
-      const text = document.getElementById('textInput').value.trim();
-      if (!text) return alert("请输入文字");
+  function detectEmotion(text) {
+    const positiveWords = ["努力", "奋斗", "希望", "阳光", "梦想"];
+    const sadWords = ["累", "心酸", "眼泪", "疲惫", "失落"];
+    const lonelyWords = ["孤独", "寂寞", "夜晚", "一个人"];
+    const healingWords = ["治愈", "温柔", "美好", "平静"];
 
-      const bgUrl = backgrounds[Math.floor(Math.random() * backgrounds.length)];
+    text = text.toLowerCase();
 
-      const synth = window.speechSynthesis;
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'zh-CN';
-      utter.rate = 1;
-      const voice = synth.getVoices().find(v => v.lang === 'zh-CN');
-      if (voice) utter.voice = voice;
+    if (sadWords.some(w => text.includes(w))) return "sad";
+    if (lonelyWords.some(w => text.includes(w))) return "lonely";
+    if (healingWords.some(w => text.includes(w))) return "healing";
+    return "positive";
+  }
 
-      // 拆字幕
-      const segments = text.match(/.{1,8}/g) || [text];
-      let index = 0;
+  generateBtn.onclick = async () => {
+    const text = document.getElementById("textInput").value.trim();
+    if (!text) return alert("请输入文字！");
 
-      // 启动语音录制
-      const audioCtx = new AudioContext();
-      const dest = audioCtx.createMediaStreamDestination();
-      const recorder = new MediaRecorder(dest.stream);
-      const chunks = [];
+    const emotion = detectEmotion(text);
+    const bgUrl = backgrounds[emotion][Math.floor(Math.random() * backgrounds[emotion].length)];
+    preview.src = bgUrl;
 
-      recorder.ondataavailable = e => chunks.push(e.data);
-      recorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: 'audio/mp3' });
-        const audioData = new Uint8Array(await blob.arrayBuffer());
-        await mergeVideo(bgUrl, audioData);
-      };
-
-      recorder.start();
-      synth.speak(utter);
-
-      // 动态字幕
-      const showNextSubtitle = () => {
-        if (index < segments.length) {
-          subtitle.innerText = segments[index++];
-          subtitle.style.opacity = 1;
-          setTimeout(() => {
-            subtitle.style.opacity = 0;
-            showNextSubtitle();
-          }, 1200);
-        } else {
-          subtitle.innerText = "";
-        }
-      };
-      showNextSubtitle();
-
-      utter.onend = () => recorder.stop();
+    // 字幕节奏
+    const parts = text.match(/.{1,10}/g) || [text];
+    let i = 0;
+    const showNext = () => {
+      if (i < parts.length) {
+        subtitle.textContent = parts[i++];
+        setTimeout(showNext, 2000);
+      } else subtitle.textContent = "";
     };
+    showNext();
 
-    async function mergeVideo(videoUrl, audioBytes) {
-      const { createFFmpeg, fetchFile } = FFmpeg;
-      const ffmpeg = createFFmpeg({ log: false });
-      await ffmpeg.load();
-
-      const videoArray = new Uint8Array(await (await fetch(videoUrl)).arrayBuffer());
-      const musicArray = new Uint8Array(await (await fetch(music)).arrayBuffer());
-
-      ffmpeg.FS("writeFile", "bg.mp4", videoArray);
-      ffmpeg.FS("writeFile", "voice.mp3", audioBytes);
-      ffmpeg.FS("writeFile", "bgm.mp3", musicArray);
-
-      await ffmpeg.run("-i", "bg.mp4", "-i", "voice.mp3", "-i", "bgm.mp3", "-filter_complex", "amix=inputs=2:duration=shortest", "-shortest", "-c:v", "copy", "out.mp4");
-
-      const output = ffmpeg.FS("readFile", "out.mp4");
-      const videoBlob = new Blob([output.buffer], { type: "video/mp4" });
-      const videoURL = URL.createObjectURL(videoBlob);
-
-      preview.src = videoURL;
-      link.href = videoURL;
-      link.download = "emotion-video.mp4";
-      link.style.display = "block";
-    }
+    // 中文男声
+    const synth = window.speechSynthesis;
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "zh-CN";
+    utter.pitch = 0.9;
+    utter.rate = 1.0;
+    utter.volume = 1.0;
+    synth.speak(utter);
+  };
   </script>
 </body>
 </html>
