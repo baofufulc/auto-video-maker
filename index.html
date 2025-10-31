@@ -3,68 +3,62 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI情感短视频生成器 v7.2</title>
+<title>AI情感短视频生成器 v8.0</title>
 <style>
 body {
-  margin: 0; background: #000; color: white;
-  font-family: "Microsoft YaHei", sans-serif;
-  display: flex; flex-direction: column; align-items: center;
+  margin: 0; background: #000; color: white; font-family: "Microsoft YaHei";
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
   height: 100vh; overflow: hidden;
 }
-h2 { margin-top: 10px; }
+h2 { margin: 10px; font-size: 20px; }
 textarea {
-  width: 90%; height: 100px; font-size: 16px;
-  border-radius: 8px; padding: 8px; outline: none; border: none;
+  width: 90%; height: 100px; font-size: 16px; border-radius: 10px;
+  padding: 8px; border: none; outline: none;
 }
 button {
-  margin: 8px; padding: 10px 20px; font-size: 16px;
-  border: none; border-radius: 8px;
+  margin: 8px; padding: 10px 20px; font-size: 16px; border-radius: 8px;
+  border: none; cursor: pointer; color: white;
   background: linear-gradient(45deg, #ff3366, #ff6600);
-  color: white; cursor: pointer;
 }
-.video-container {
-  position: relative; width: 360px; height: 640px;
-  border-radius: 12px; overflow: hidden; margin-top: 10px;
+.video-box {
+  position: relative; width: 360px; height: 640px; overflow: hidden;
+  border-radius: 15px; box-shadow: 0 0 20px #ff0066;
 }
 video {
   width: 100%; height: 100%; object-fit: cover;
   filter: brightness(0.7);
 }
 .subtitle {
-  position: absolute; bottom: 60px; width: 100%;
-  text-align: center; font-size: 22px; font-weight: bold;
-  color: #fff; text-shadow: 0 0 12px #ff0066, 0 0 20px #ff66cc;
+  position: absolute; bottom: 80px; width: 100%; text-align: center;
+  font-size: 22px; font-weight: bold; color: #fff;
+  text-shadow: 0 0 12px #ff0066, 0 0 25px #ff66cc;
   animation: glow 2s ease-in-out infinite alternate;
 }
 @keyframes glow { 0% {opacity: 0.6;} 100% {opacity: 1;} }
 </style>
 </head>
 <body>
-  <h2>🎬 AI情感短视频生成器 v7.2</h2>
-  <textarea id="textInput" placeholder="输入文字，例如：我拼命努力，是因为别无选择..."></textarea>
+  <h2>🎬 AI情感短视频生成器 v8.0</h2>
+  <textarea id="textInput" placeholder="输入情感文案，例如：我拼命努力，是因为别无选择..."></textarea>
   <div>
     <button id="generateBtn">生成视频</button>
     <button id="downloadBtn">下载MP4</button>
   </div>
 
-  <div class="video-container" id="videoArea">
-    <video id="preview" autoplay loop muted></video>
-    <audio id="bgm" loop></audio>
-    <div id="subtitle" class="subtitle"></div>
+  <div class="video-box" id="videoArea">
+    <video id="bgVideo" autoplay loop muted></video>
+    <div class="subtitle" id="subtitle"></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/recordrtc@5.6.2/RecordRTC.min.js"></script>
   <script>
-  const preview = document.getElementById("preview");
-  const bgm = document.getElementById("bgm");
+  const bgVideo = document.getElementById("bgVideo");
   const subtitle = document.getElementById("subtitle");
+  const generateBtn = document.getElementById("generateBtn");
   const downloadBtn = document.getElementById("downloadBtn");
+  let recorder;
 
   const backgrounds = {
-    positive: [
-      "https://cdn.pixabay.com/video/2023/06/14/167305-839689132_tiny.mp4",
-      "https://cdn.pixabay.com/video/2023/02/16/151125-795688312_tiny.mp4"
-    ],
     sad: [
       "https://cdn.pixabay.com/video/2024/01/02/197045-899816385_tiny.mp4",
       "https://cdn.pixabay.com/video/2023/12/21/194434-896594650_tiny.mp4"
@@ -76,77 +70,64 @@ video {
     healing: [
       "https://cdn.pixabay.com/video/2023/09/04/178506-863291441_tiny.mp4",
       "https://cdn.pixabay.com/video/2023/06/27/169742-846511832_tiny.mp4"
+    ],
+    positive: [
+      "https://cdn.pixabay.com/video/2023/02/16/151125-795688312_tiny.mp4",
+      "https://cdn.pixabay.com/video/2023/06/14/167305-839689132_tiny.mp4"
     ]
   };
 
-  const musics = {
-    positive: "https://cdn.pixabay.com/download/audio/2023/04/11/audio_55b63c7c68.mp3?filename=inspired-ambient-piano-145468.mp3",
-    sad: "https://cdn.pixabay.com/download/audio/2023/03/15/audio_29ec0ec167.mp3?filename=sad-piano-143077.mp3",
-    lonely: "https://cdn.pixabay.com/download/audio/2023/04/11/audio_8d9f6d7a7d.mp3?filename=lonesome-145487.mp3",
-    healing: "https://cdn.pixabay.com/download/audio/2023/04/12/audio_9c8f0e7895.mp3?filename=soft-healing-piano-145611.mp3"
-  };
-
   function detectEmotion(text) {
-    const positiveWords = ["努力","奋斗","希望","阳光","梦想"];
-    const sadWords = ["累","心酸","眼泪","疲惫","失落","难过"];
-    const lonelyWords = ["孤独","寂寞","夜晚","一个人"];
-    const healingWords = ["治愈","温柔","美好","平静","安静"];
-    text = text.toLowerCase();
-    if (sadWords.some(w => text.includes(w))) return "sad";
-    if (lonelyWords.some(w => text.includes(w))) return "lonely";
-    if (healingWords.some(w => text.includes(w))) return "healing";
-    return "positive";
+    const map = {
+      sad: ["累","心酸","眼泪","疲惫","失落","难过"],
+      lonely: ["孤独","寂寞","夜","冷","一个人"],
+      healing: ["温柔","治愈","平静","放松","安静"],
+      positive: ["奋斗","努力","希望","梦想","阳光"]
+    };
+    for (let [key, words] of Object.entries(map)) {
+      if (words.some(w => text.includes(w))) return key;
+    }
+    return "sad";
   }
 
-  let recorder;
-
-  document.getElementById("generateBtn").onclick = async () => {
+  generateBtn.onclick = async () => {
     const text = document.getElementById("textInput").value.trim();
-    if (!text) return alert("请输入文字！");
-
+    if (!text) return alert("请输入文字");
     const emotion = detectEmotion(text);
-    const bgUrl = backgrounds[emotion][Math.floor(Math.random() * backgrounds[emotion].length)];
-    const musicUrl = musics[emotion];
+    const bg = backgrounds[emotion][Math.floor(Math.random()*backgrounds[emotion].length)];
+    bgVideo.src = bg;
 
-    preview.src = bgUrl;
-    bgm.src = musicUrl;
-    bgm.play();
-    preview.muted = false;
-
-    const parts = text.match(/.{1,10}/g) || [text];
-    let i = 0;
-    subtitle.textContent = parts[0];
-    const timer = setInterval(() => {
-      if (++i < parts.length) subtitle.textContent = parts[i];
-      else clearInterval(timer);
-    }, 2000);
-
-    const synth = window.speechSynthesis;
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = "zh-CN";
-    utter.pitch = 0.8;
-    utter.rate = 0.95;
-    synth.cancel();
-    synth.speak(utter);
+    utter.pitch = 0.6; // 低沉
+    utter.rate = 0.92; // 稍慢，显情感
+    utter.volume = 1;
+    utter.onstart = () => {
+      const parts = text.match(/.{1,10}/g) || [text];
+      let i = 0;
+      subtitle.textContent = parts[0];
+      const timer = setInterval(() => {
+        i++;
+        if (i < parts.length) subtitle.textContent = parts[i];
+        else clearInterval(timer);
+      }, 2000);
+    };
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utter);
   };
 
   downloadBtn.onclick = async () => {
-    const videoArea = document.getElementById("videoArea");
-    const stream = videoArea.captureStream(30);
-    const audioStream = bgm.captureStream();
-    const combined = new MediaStream([...stream.getTracks(), ...audioStream.getTracks()]);
-
-    recorder = new RecordRTC(combined, { type: "video" });
+    const stream = document.getElementById("videoArea").captureStream(30);
+    recorder = new RecordRTC(stream, { type: "video" });
     recorder.startRecording();
-
-    alert("录制中... 5 秒后自动完成");
+    alert("🎥 开始录制，约5秒后自动生成视频...");
     setTimeout(async () => {
       await recorder.stopRecording(() => {
         const blob = recorder.getBlob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "ai_video.mp4";
+        a.download = "emotion_video.mp4";
         a.click();
       });
     }, 5000);
