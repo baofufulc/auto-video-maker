@@ -1,116 +1,83 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI文字转视频生成器</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI短视频生成器</title>
   <style>
-    body {
-      font-family: "Microsoft YaHei", sans-serif;
-      background: linear-gradient(to bottom right, #111, #333);
+    body { 
+      font-family: '微软雅黑', sans-serif; 
+      background: linear-gradient(to bottom, #1e1e2f, #111);
       color: #fff;
       text-align: center;
-      padding: 40px;
+      padding: 20px;
     }
-    h1 { color: #ffd700; }
     textarea {
       width: 90%;
       height: 120px;
-      border-radius: 10px;
-      border: none;
       padding: 10px;
       font-size: 16px;
+      border-radius: 10px;
+      border: none;
       outline: none;
+      resize: none;
     }
     button {
-      margin-top: 20px;
-      padding: 12px 30px;
-      background: #ffd700;
+      background: #007bff;
+      color: #fff;
       border: none;
-      border-radius: 10px;
-      font-size: 18px;
+      padding: 10px 20px;
+      border-radius: 8px;
       cursor: pointer;
+      margin-top: 10px;
     }
     video {
-      margin-top: 30px;
-      width: 300px;
-      border-radius: 20px;
-      display: none;
+      width: 100%;
+      border-radius: 10px;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>🎬 AI 文字转视频生成器（离线版）</h1>
-  <p>输入你的情感文案，自动生成短视频 🎶</p>
-  <textarea id="inputText" placeholder="例如：我为什么要拼命挣钱，因为我没有背景……"></textarea><br />
+  <h2>🎬 自动AI短视频生成器</h2>
+  <p>输入一段文字，自动生成带中文男声语音和背景视频</p>
+
+  <textarea id="textInput" placeholder="例如：我拼命赚钱，因为我没有背景，也没有依靠……"></textarea><br>
   <button onclick="generateVideo()">生成视频</button>
-  <div id="status"></div>
-  <video id="preview" controls></video>
+
+  <video id="outputVideo" controls></video>
 
   <script>
     async function generateVideo() {
-      const text = document.getElementById("inputText").value.trim();
-      if (!text) return alert("请输入文本");
+      const text = document.getElementById("textInput").value.trim();
+      if (!text) {
+        alert("请输入文字内容！");
+        return;
+      }
 
-      const status = document.getElementById("status");
-      const video = document.getElementById("preview");
-      status.innerHTML = "正在生成背景和配乐，请稍候…";
+      alert("🎥 正在生成视频，请稍候...");
 
-      // 1. 根据文字生成背景图
-      const bg = `https://source.unsplash.com/720x1280/?night,city,emotion,${encodeURIComponent(text.slice(0,10))}`;
-
-      // 2. 随机选择一段背景音乐
-      const musicList = [
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+      // 背景视频：自动选择城市或自然风景
+      const backgrounds = [
+        "https://cdn.coverr.co/videos/coverr-sunrise-over-the-city-9071/1080p.mp4",
+        "https://cdn.coverr.co/videos/coverr-green-mountain-forest-1570/1080p.mp4",
+        "https://cdn.coverr.co/videos/coverr-night-city-streets-1910/1080p.mp4",
+        "https://cdn.coverr.co/videos/coverr-clouds-and-sunset-8244/1080p.mp4"
       ];
-      const music = musicList[Math.floor(Math.random() * musicList.length)];
+      const bgVideo = backgrounds[Math.floor(Math.random() * backgrounds.length)];
 
-      // 3. 使用 Canvas 绘制字幕（简化版）
-      status.innerHTML = "正在合成视频...";
+      // 中文男声语音（浏览器TTS）
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.pitch = 1;
+      utterance.rate = 1;
+      utterance.voice = speechSynthesis.getVoices().find(v => v.lang === 'zh-CN');
+      speechSynthesis.speak(utterance);
 
-      // 使用 HTML5 MediaRecorder 动态生成视频
-      const canvas = document.createElement("canvas");
-      canvas.width = 720;
-      canvas.height = 1280;
-      const ctx = canvas.getContext("2d");
-
-      const stream = canvas.captureStream();
-      const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
-      const chunks = [];
-
-      recorder.ondataavailable = e => chunks.push(e.data);
-      recorder.onstop = e => {
-        const blob = new Blob(chunks, { type: "video/webm" });
-        const url = URL.createObjectURL(blob);
-        video.src = url;
-        video.style.display = "block";
-        status.innerHTML = "✅ 视频生成成功！";
-      };
-
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = bg;
-      await new Promise(r => img.onload = r);
-
-      recorder.start();
-
-      let i = 0;
-      const words = text.split("");
-      const draw = setInterval(() => {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(0, 1000, 720, 280);
-        ctx.fillStyle = "#fff";
-        ctx.font = "32px Microsoft YaHei";
-        ctx.textAlign = "center";
-        ctx.fillText(words.slice(0, i).join(""), 360, 1150);
-        i++;
-        if (i > words.length) {
-          clearInterval(draw);
-          recorder.stop();
-        }
-      }, 100);
+      // 显示背景视频
+      const videoElement = document.getElementById("outputVideo");
+      videoElement.src = bgVideo;
+      videoElement.play();
     }
   </script>
 </body>
